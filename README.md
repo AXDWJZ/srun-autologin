@@ -1,6 +1,6 @@
 # 校园网自动登录（深澜 / Srun 认证）
 
-一个**零依赖**的 Windows 校园网登录脚本，适用于使用**深澜（Srun / Shenlan）**认证系统的学校（示例为西南石油大学 `SWPU-EDU`）。
+一个**零依赖**的 Windows 校园网工具：**自动连上校园网 WiFi + 自动完成认证**，适用于使用**深澜（Srun / Shenlan）**认证系统的学校（示例为西南石油大学 `SWPU-EDU`）。
 
 只用 Windows 自带的 **PowerShell 5.1**，不需要安装 Python、Node 或任何第三方库。
 
@@ -8,11 +8,12 @@
 
 ## 功能
 
-- 自动完成深澜认证（XXTEA 加密 + 自定义 base64 + HMAC-MD5 校验）
-- 双击一个快捷方式即可连接（会**真实验证**能否上网，而不是只看接口返回）
-- 支持手动模式 / 后台守护模式
-- 自动适配 IP 变化（换 AP、换网段）
-- 日志记录，方便排查
+- ✅ **自动连接校园网 WiFi**（不用先在 WiFi 列表里手动点）
+- ✅ 自动完成深澜认证（XXTEA 加密 + 自定义 base64 + HMAC-MD5 校验）
+- ✅ 连接后会**真实验证**能否上网（不是只看接口返回）
+- ✅ 自动适配 IP 变化（换 AP、换网段）
+- ✅ 支持手动双击 / 开机自启
+- ✅ 日志记录，方便排查
 
 ## 环境要求
 
@@ -21,21 +22,22 @@
 
 ## 快速开始
 
-1. 把本仓库所有文件下载/克隆到本地任意目录。
-2. 复制 `config.example.json` 为 `config.json`，填入你自己的账号信息：
+1. 把本仓库所有文件下载到本地任意目录。
+2. 复制 `config.example.json` 为 `config.json`，填入你自己的信息：
 
    ```json
    {
      "portal": "172.16.245.50",
+     "ssid": "SWPU-EDU",
      "username": "YOUR_STUDENT_ID@dxwx",
      "password": "YOUR_PASSWORD",
      "acId": "1"
    }
    ```
 
-3. 双击 `connect.ps1` 即可连接（或右键 → 使用 PowerShell 运行）。
+3. 双击 `connect.ps1` 即可：它会自动连 WiFi → 自动登录 → 验证上网。
 
-> 如果双击 `.ps1` 打不开，可在该目录打开 PowerShell 后执行：
+> 如果双击 `.ps1` 打不开（被编辑器接走或执行策略拦截），在该目录打开 PowerShell 执行：
 > ```powershell
 > powershell -NoProfile -ExecutionPolicy Bypass -File .\connect.ps1
 > ```
@@ -44,62 +46,65 @@
 
 | 字段 | 说明 |
 |---|---|
-| `portal` | 认证服务器地址（学校门户 IP，可在浏览器登录页地址栏看到） |
-| `username` | 学号 + 运营商域名，例如 `202600000000@dxwx`（域名见下方说明） |
+| `portal` | 认证服务器地址（学校门户 IP，见浏览器登录页地址栏） |
+| `ssid` | 校园网 WiFi 名称，例如 `SWPU-EDU`（留空则跳过自动连 WiFi） |
+| `username` | 学号 + 运营商域名，例如 `202600000000@dxwx`（见下方说明） |
 | `password` | 校园网密码 |
-| `acId` | 认证接入点 ID，一般门户页 `ac_id=1` 就是 `1` |
+| `acId` | 认证接入点 ID，一般门户 `ac_id=1` 就是 `1` |
 
 ### 关于运营商域名（`@xxx`）
 
-很多学校的"电信/移动/联通"套餐，登录用户名需要带运营商后缀。获取方法：
+很多学校的"电信/移动/联通"套餐要求用户名带运营商后缀。获取方法：
 
 1. 先用浏览器正常登录校园网；
 2. 访问认证服务器的在线信息接口，例如
    `http://172.16.245.50/cgi-bin/rad_user_info?callback=jQuery`
-3. 返回的 JSON 里 `"domain"` 就是后缀（如 `"dxwx"`），拼成 `学号@dxwx`。
+3. 返回 JSON 里的 `"domain"` 就是后缀（如 `"dxwx"`），拼成 `学号@dxwx`。
 
-如果该字段为空，就不需要后缀。
+该字段为空则不需要后缀。
 
 ## 使用方法
 
-### 方式一：手动双击（推荐，简单可靠）
+### 方式一：双击连接（推荐）
 
-- 双击 `connect.ps1` / 或你自己创建的快捷方式
-- 看到 `>>> 连接成功！已实测确认可以正常上网。` 即表示可以上网
+- 双击 `connect.ps1`（或你创建的快捷方式）
+- 看到 `>>> 连接成功！已实测确认可以正常上网。` 即成功
 
 ### 方式二：命令行
 
 ```powershell
-# 登录一次
+# 登录一次（会自动连 WiFi）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\campus_login.ps1 -Once
 
-# 只输出调试信息（自检，不联网）
+# 自检（不联网）
 powershell -NoProfile -ExecutionPolicy Bypass -File .\campus_login.ps1 -SelfTest
 ```
 
-### 方式三：后台守护（可选）
+### 方式三：开机自启
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\campus_login.ps1
+把下面这条做成快捷方式放进「启动」文件夹（`Win+R` 输入 `shell:startup`）：
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "<脚本路径>\campus_login.ps1" -Once -MaxAttempts 60
 ```
 
-守护模式会常驻后台，每 `IntervalSeconds` 秒检查一次，掉线后自动重连。
-> 注意：部分安全软件可能对"隐藏窗口 + 常驻 + 周期性网络请求"比较敏感，可按需添加信任/排除。
+开机时它会自动连 WiFi、重试登录（最多约 10 分钟），成功后自动退出，不常驻。
 
 ## 工作原理（简述）
 
-1. `GET /cgi-bin/get_challenge` 获取一次性 `challenge` 令牌和客户端 IP；
-2. 用 `HMAC-MD5(token, password)` 生成密码摘要；
-3. 用 **XXTEA** 加密用户信息 JSON，再用**自定义字母表**做 base64，得到 `{SRBX1}...`；
-4. 拼接参数计算 `chksum = SHA1(...)`；
-5. `GET /cgi-bin/srun_portal?action=login&...` 完成认证。
+1. `netsh wlan connect` 连接校园网 SSID（如未连接）；
+2. `GET /cgi-bin/get_challenge` 获取 `challenge` 令牌与客户端 IP；
+3. `HMAC-MD5(token, password)` 生成密码摘要；
+4. **XXTEA** 加密用户信息 JSON + **自定义字母表 base64** → `{SRBX1}...`；
+5. `SHA1(...)` 计算 `chksum`；
+6. `GET /cgi-bin/srun_portal?action=login&...` 完成认证。
 
-代码里内嵌了一小段 C#（通过 `Add-Type` 编译）来实现 32 位 XXTEA 运算，保证在 PowerShell 5.1 下也能正确计算。
+脚本内嵌一小段 C#（通过 `Add-Type`）实现 32 位 XXTEA，保证 PowerShell 5.1 下计算正确。
 
 ## 安全提醒
 
-- `config.json` 里有**明文密码**，已在 `.gitignore` 中排除，**切勿提交**。
-- 请只用于**你自己的账号**；不要用来登录他人账号或绕过网络管理策略。
+- `config.json` 内有**明文密码**，已在 `.gitignore` 中排除，**切勿提交**。
+- 请只用于**你自己的账号**，不要用于登录他人账号或绕过网络管理策略。
 - 本脚本仅与学校认证服务器通信，不收集、不上传任何其他数据。
 
 ## 免责声明

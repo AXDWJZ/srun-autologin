@@ -5,6 +5,11 @@
 #
 #  Pure Windows PowerShell 5.1, no third-party dependencies.
 #  Account settings are read from config.json (NOT committed).
+#
+#  Features:
+#    - auto-connect to the campus WiFi SSID (netsh)
+#    - XXTEA + custom base64 + HMAC-MD5 authentication
+#    - one-shot login (-Once) or background guard
 # ============================================================
 
 param(
@@ -28,6 +33,7 @@ $PORTAL   = [string]$cfg.portal
 $USERNAME = [string]$cfg.username
 $PASSWORD = [string]$cfg.password
 $AC_ID    = [string]$cfg.acId
+$SSID     = [string]$cfg.ssid
 $N        = 200
 $TYPE     = 1
 
@@ -139,6 +145,32 @@ function Write-Log([string]$msg) {
     try { Add-Content -Path $LOG_FILE -Value $line -Encoding UTF8 } catch {}
 }
 
+function Get-CurSsid {
+    try {
+        $out = netsh wlan show interfaces 2>$null
+        $line = $out | Where-Object { $_ -match '^\s*SSID\s*:' } | Select-Object -First 1
+        if ($line) { return ($line -split ':', 2)[1].Trim() }
+    } catch {}
+    return ""
+}
+
+function Ensure-Wifi([string]$target) {
+    if (-not $target) { return $true }
+    $cur = Get-CurSsid
+    if ($cur -eq $target) { return $true }
+    Write-Log ("WiFi current SSID is '{0}', trying to connect to '{1}' ..." -f $cur, $target)
+    for ($i = 1; $i -le 5; $i++) {
+        try { & netsh wlan connect "name=$target" 2>$null | Out-Null } catch {}
+        Start-Sleep -Seconds 3
+        if ((Get-CurSsid) -eq $target) {
+            Write-Log ("WiFi connected: {0}" -f $target)
+            return $true
+        }
+    }
+    Write-Log ("WiFi connect to '{0}' failed." -f $target)
+    return $false
+}
+
 function Get-Challenge {
     $ts = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
     $u = "http://$PORTAL/cgi-bin/get_challenge?callback=jQuery&username=$USERNAME&ip=&_=$ts"
@@ -238,6 +270,7 @@ function Try-Login([int]$tries) {
 
 if ($Once) {
     Write-Log "One-shot login ..."
+    $null = Ensure-Wifi $SSID
     $null = Try-Login $MaxAttempts
     return
 }
@@ -246,6 +279,7 @@ Write-Log ("Guard started, check every {0}s." -f $IntervalSeconds)
 while ($true) {
     try {
         if (-not (Test-Online)) {
+            $null = Ensure-Wifi $SSID
             Write-Log "Offline detected, trying to login ..."
             $null = Try-Login 3
         }
